@@ -85,6 +85,17 @@ rmvn <- function(n, mu, sigma, ncores = 1, isChol = FALSE, A = NULL)
          isChol_ = isChol, 
          A_ = A )
   
+  # Add dimnames to matrix
+  mu_names <- names(mu)
+  sigma_names <- dimnames(sigma)[[1L]]  
+    
+  if (!is.null(nm))  
+      A_names <- mu_names
+  if (is.null(nm) && !(is.null(sigma_names))
+      A_names <- sigma_names
+  dimnames(A) <- list(1:n, A_names) 
+      
+      
   # Return a matrix if no storage was provided and NULL if it was provided.
   if( retMat ) {
     return( A );
@@ -93,3 +104,4 @@ rmvn <- function(n, mu, sigma, ncores = 1, isChol = FALSE, A = NULL)
   }
   
 }
+      
