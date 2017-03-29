@@ -104,4 +104,3 @@ rmvn <- function(n, mu, sigma, ncores = 1, isChol = FALSE, A = NULL)
   }
   
 }
-      
