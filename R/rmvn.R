@@ -88,11 +88,14 @@ rmvn <- function(n, mu, sigma, ncores = 1, isChol = FALSE, A = NULL)
   # Add dimnames to matrix
   mu_names <- names(mu)
   sigma_names <- dimnames(sigma)[[1L]]  
-    
-  if (!is.null(nm))  
-      A_names <- mu_names
-  if (is.null(nm) && !(is.null(sigma_names))
-      A_names <- sigma_names
+  
+  if (!is.null(mu_names)) { 
+    A_names <- mu_names
+  }
+  if (is.null(mu_names) && !(is.null(sigma_names))) {
+    A_names <- sigma_names
+  }
+      
   dimnames(A) <- list(1:n, A_names) 
       
       
