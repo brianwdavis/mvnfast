@@ -91,6 +91,20 @@ rmvt <- function(n, mu, sigma, df, ncores = 1, isChol = FALSE, A = NULL)
          ncores_ = ncores,
          isChol_ = isChol, 
          A_ = A )
+
+  # Add dimnames to matrix
+  mu_names <- names(mu)
+  sigma_names <- dimnames(sigma)[[1L]]  
+  
+  if (!is.null(mu_names)) { 
+    A_names <- mu_names
+  }
+  if (is.null(mu_names) && !(is.null(sigma_names))) {
+    A_names <- sigma_names
+  }
+  
+  dimnames(A) <- list(1:n, A_names) 
+
   
   # Return a matrix if no storage was provided and NULL if it was provided.
   if( retMat ) {

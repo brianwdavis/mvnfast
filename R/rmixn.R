@@ -98,7 +98,21 @@ rmixn <- function(n, mu, sigma, w, ncores = 1, isChol = FALSE, retInd = FALSE, A
          isChol_ = isChol, 
          retInd_ = retInd,
          A_ = A )
+
+  # Add dimnames to matrix
+  mu_names <- dimnames(mu)[[2L]]
+  sigma_names <- dimnames(sigma[[1L]])[[2]]
   
+  if (!is.null(mu_names)) { 
+    A_names <- mu_names
+  }
+  if (is.null(mu_names) && !(is.null(sigma_names))) {
+    A_names <- sigma_names
+  }
+  
+  dimnames(A) <- list(1:n, A_names)   
+
+
   # Return a matrix if no storage was provided and NULL if it was provided.
   if( retMat ) {
     return( A );
