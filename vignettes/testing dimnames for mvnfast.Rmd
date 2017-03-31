@@ -1,0 +1,402 @@
+---
+title: "Names for mvnfast results"
+author: "Brian W. Davis"
+output:
+  html_document: default
+---
+
+
+Adding dimension names to the output of `mvnfast`
+====
+
+``` {r pack, message = F, warning = F}
+require(MASS)
+require(mvnfast)
+require(plyr)
+require(dplyr)
+require(stringr)
+require(ggplot2)
+require(microbenchmark)
+require(mnormt)
+require(lme4)
+require(mclust)
+```
+
+
+# `rmvn()`
+
+``` {r}
+
+fit.rmvn <- lmer(yv ~ xv1*xv2*xv3*xv4*xv5*xv6 + (1|block), 
+                 data_frame(xv1 = rnorm(1000), xv2 = rnorm(1000), xv3 = rnorm(1000), 
+                            xv4 = rnorm(1000), xv5 = rnorm(1000), xv6 = rnorm(1000), 
+                            yv = (1 + xv1 + xv2 + xv3 + xv4 + xv5 + xv6)^3, 
+                            block = rep(1:5, 200)))
+summary(fit.rmvn)
+
+rmvn(10, fixef(fit.rmvn), vcov(fit.rmvn))
+
+rmvn.fork <- function(n, mu, sigma, ncores = 1, isChol = FALSE, A = NULL)
+{
+  d <- length(mu)
+  
+  if( !is.matrix(sigma) ) sigma <- as.matrix( sigma )
+  
+  if( ncores > 1 && grepl('SunOS', Sys.info()['sysname']) ){
+    
+    message("rmvn() cannot be used on multiple cores under Solaris. I am resetting \"ncores\" to 1.")
+    
+    ncores <- 1
+    
+  }
+  
+  # Create output matrix
+  if( is.null(A) ) {
+    retMat <- TRUE # We return a matrix
+    A <- matrix(nrow = n, ncol = d) 
+    class(A) <- "numeric"
+  } else {
+    retMat <- FALSE # We return NULL
+    if( class(A[1, 1]) != "numeric" ){ 
+      stop("class(A[1, 1]) != \"numeric\", to avoid this do class(A)<-\"numeric\".")
+    }
+  } 
+  
+  .Call( "rmvnCpp", 
+         n_ = n, 
+         mu_ = mu, 
+         sigma_ = sigma, 
+         ncores_ = ncores,
+         isChol_ = isChol, 
+         A_ = A )
+  
+  # Add dimnames to matrix
+  mu_names <- names(mu)
+  sigma_names <- dimnames(sigma)[[1L]]  
+  
+  if (!is.null(mu_names)) { 
+    A_names <- mu_names
+  }
+  if (is.null(mu_names) && !(is.null(sigma_names))) {
+    A_names <- sigma_names
+  }
+  
+  dimnames(A) <- list(1:n, A_names) 
+  
+  
+  # Return a matrix if no storage was provided and NULL if it was provided.
+  if( retMat ) {
+    return( A );
+  } else {
+    return( invisible(NULL) )
+  }
+  
+}
+
+
+rmvn.fork(10, fixef(fit.rmvn), vcov(fit.rmvn))
+
+
+(mbn <- microbenchmark(rmvn.fork(1000, fixef(fit.rmvn), vcov(fit.rmvn)),
+                     rmvn(1000, fixef(fit.rmvn), vcov(fit.rmvn)),
+                     MASS::mvrnorm(1000, fixef(fit.rmvn), vcov(fit.rmvn)),
+                     mnormt::rmnorm(1000, fixef(fit.rmvn), vcov(fit.rmvn)))  )
+
+mbn %>% mutate(expr = str_wrap(as.character(expr), width = 20, exdent = 2)) %>% 
+  ggplot(aes(expr, time/1000000)) + 
+  geom_violin() + coord_flip() + 
+  theme(axis.text.y = element_text(hjust = 0, family = "mono")) +
+  labs(y = "milliseconds", x = "", title = "n = (1000) * 100")
+
+
+```
+
+
+# `rmvt()`
+
+``` {r}
+
+
+rmvt(10, fixef(fit.rmvn), vcov(fit.rmvn), df = 2)
+
+
+rmvt.fork <- function(n, mu, sigma, df, ncores = 1, isChol = FALSE, A = NULL)
+{
+  d <- length(mu)
+  
+  if( !is.matrix(sigma) ) sigma <- as.matrix( sigma )
+  
+  if( ncores > 1 && grepl('SunOS', Sys.info()['sysname']) ){
+    
+    message("rmvt() cannot be used on multiple cores under Solaris. I am resetting \"ncores\" to 1.")
+    
+    ncores <- 1
+    
+  }
+  
+  # Create output matrix
+  if( is.null(A) ) {
+    retMat <- TRUE # We return a matrix
+    A <- matrix(nrow = n, ncol = d) 
+    class(A) <- "numeric"
+  } else {
+    retMat <- FALSE # We return NULL
+    if( class(A[1, 1]) != "numeric" ){ 
+      stop("class(A[1, 1]) != \"numeric\", to avoid this do class(A)<-\"numeric\".")
+    }
+  } 
+  
+  .Call( "rmvtCpp", 
+         n_ = n, 
+         mu_ = mu, 
+         sigma_ = sigma, 
+         df_ = df,
+         ncores_ = ncores,
+         isChol_ = isChol, 
+         A_ = A )
+  
+  # Add dimnames to matrix
+  mu_names <- names(mu)
+  sigma_names <- dimnames(sigma)[[1L]]  
+  
+  if (!is.null(mu_names)) { 
+    A_names <- mu_names
+  }
+  if (is.null(mu_names) && !(is.null(sigma_names))) {
+    A_names <- sigma_names
+  }
+  
+  dimnames(A) <- list(1:n, A_names) 
+  
+  
+  # Return a matrix if no storage was provided and NULL if it was provided.
+  if( retMat ) {
+    return( A );
+  } else {
+    return( invisible(NULL) )
+  }
+  
+}
+
+rmvt.fork(10, fixef(fit.rmvn), vcov(fit.rmvn), df = 2)
+
+(mbt <- microbenchmark(rmvt.fork(1000, fixef(fit.rmvn), vcov(fit.rmvn), df = 2),
+               rmvt(1000, fixef(fit.rmvn), vcov(fit.rmvn), df = 2),
+               mnormt::rmt(1000, fixef(fit.rmvn), vcov(fit.rmvn), df = 2))  )
+
+
+mbt %>% mutate(expr = str_wrap(as.character(expr), width = 15, exdent = 2)) %>% 
+  ggplot(aes(expr, time/1000000)) + 
+  geom_violin() + coord_flip() + 
+  theme(axis.text.y = element_text(hjust = 0, family = "mono")) +
+  labs(y = "milliseconds", x = "", title = "n = (1000) * 100")
+
+```
+
+
+# `rmixn()`
+
+``` {r}
+
+
+fit.rmixn <-  Mclust(iris[,1:4], G = 3)
+summary(fit.rmixn)
+
+
+(t(fit.rmixn$parameters$mean) %>% dimnames)[[2]]
+plyr::alply(fit.rmixn$parameters$variance$sigma,3)[[1]] %>% dimnames
+fit.rmixn$parameters$pro
+
+rmixn(12, t(fit.rmixn$parameters$mean), 
+      plyr::alply(fit.rmixn$parameters$variance$sigma,3), 
+      w = fit.rmixn$parameters$pro) 
+
+
+rmixn.fork <- function(n, mu, sigma, w, ncores = 1, isChol = FALSE, retInd = FALSE, A = NULL)
+{
+  d <- ncol(mu)
+  m <- length(w)
+  
+  if( !is.matrix(sigma) ) sigma <- as.matrix( sigma )
+  
+  if( ncores > 1 && grepl('SunOS', Sys.info()['sysname']) ){
+    
+    message("rmvn() cannot be used on multiple cores under Solaris. I am resetting \"ncores\" to 1.")
+    
+    ncores <- 1
+    
+  }
+  
+  # Create output matrix
+  if( is.null(A) ) {
+    retMat <- TRUE # We return a matrix
+    A <- matrix(nrow = n, ncol = d) 
+    class(A) <- "numeric"
+  } else {
+    retMat <- FALSE # We return NULL
+    if( class(A[1, 1]) != "numeric" ){ 
+      stop("class(A[1, 1]) != \"numeric\", to avoid this do class(A)<-\"numeric\".")
+    }
+  } 
+  
+  # Associate each sample with a mixture component
+  indV <- sample(0:(m-1), n, prob = w, replace = T)
+  
+  .Call( "rmixnCpp", 
+         n_ = n, 
+         mu_ = mu, 
+         sigma_ = sigma,
+         indV_ = indV,
+         ncores_ = ncores,
+         isChol_ = isChol, 
+         retInd_ = retInd,
+         A_ = A )
+  
+  # Add dimnames to matrix
+  mu_names <- dimnames(mu)[[2L]]
+  sigma_names <- dimnames(sigma[[1L]])[[2]]
+  
+  if (!is.null(mu_names)) { 
+    A_names <- mu_names
+  }
+  if (is.null(mu_names) && !(is.null(sigma_names))) {
+    A_names <- sigma_names
+  }
+  
+  dimnames(A) <- list(1:n, A_names) 
+  
+  
+  # Return a matrix if no storage was provided and NULL if it was provided.
+  if( retMat ) {
+    return( A );
+  } else {
+    return( invisible(NULL) )
+  }
+  
+}
+
+rmixn.fork(12, t(fit.rmixn$parameters$mean), 
+           plyr::alply(fit.rmixn$parameters$variance$sigma,3), 
+           w = fit.rmixn$parameters$pro) 
+
+rmixn.fork(1000, t(fit.rmixn$parameters$mean), 
+           plyr::alply(fit.rmixn$parameters$variance$sigma,3), 
+           w = fit.rmixn$parameters$pro) %>% 
+  Mclust(.) %>% plot(., what = "classification")
+
+(mbmn <- microbenchmark(rmixn(100000, t(fit.rmixn$parameters$mean), 
+                     plyr::alply(fit.rmixn$parameters$variance$sigma,3), 
+                     w = fit.rmixn$parameters$pro),
+               rmixn.fork(100000, t(fit.rmixn$parameters$mean), 
+                          plyr::alply(fit.rmixn$parameters$variance$sigma,3), 
+                          w = fit.rmixn$parameters$pro)) )
+
+mbmn %>% 
+  mutate(expr = str_replace_all(as.character(expr), "\\), ", "\\),\n  "),
+         expr = str_replace_all(expr, ", {2,}", ", ")) %>% 
+  ggplot(aes(expr, time/1000000)) + 
+  geom_violin() + coord_flip() + 
+  theme(axis.text.y = element_text(hjust = 0, family = "mono")) +
+  labs(y = "milliseconds", x = "", title = "n = (100,000) * 100")
+
+```
+
+
+
+# `rmixt()`
+
+``` {r}
+
+
+rmixt(12, t(fit.rmixn$parameters$mean), 
+      plyr::alply(fit.rmixn$parameters$variance$sigma,3), 
+      w = fit.rmixn$parameters$pro,
+      df = 2) 
+
+
+rmixt.fork <- function(n, mu, sigma, df, w, ncores = 1, isChol = FALSE, retInd = FALSE, A = NULL)
+{
+  d <- ncol(mu)
+  m <- length(w)
+  
+  if( !is.matrix(sigma) ) sigma <- as.matrix( sigma )
+  
+  if( ncores > 1 && grepl('SunOS', Sys.info()['sysname']) ){
+    
+    message("rmvn() cannot be used on multiple cores under Solaris. I am resetting \"ncores\" to 1.")
+    
+    ncores <- 1
+    
+  }
+  
+  # Create output matrix
+  if( is.null(A) ) {
+    retMat <- TRUE # We return a matrix
+    A <- matrix(nrow = n, ncol = d) 
+    class(A) <- "numeric"
+  } else {
+    retMat <- FALSE # We return NULL
+    if( class(A[1, 1]) != "numeric" ){ 
+      stop("class(A[1, 1]) != \"numeric\", to avoid this do class(A)<-\"numeric\".")
+    }
+  } 
+  
+  # Associate each sample with a mixture component
+  indV <- sample(0:(m-1), n, prob = w, replace = T)
+  
+  .Call( "rmixtCpp", 
+         n_ = n, 
+         mu_ = mu, 
+         sigma_ = sigma,
+         df_ = df,
+         indV_ = indV,
+         ncores_ = ncores,
+         isChol_ = isChol, 
+         retInd_ = retInd,
+         A_ = A )
+  
+  # Add dimnames to matrix
+  mu_names <- dimnames(mu)[[2L]]
+  sigma_names <- dimnames(sigma[[1L]])[[2]]
+  
+  if (!is.null(mu_names)) { 
+    A_names <- mu_names
+  }
+  if (is.null(mu_names) && !(is.null(sigma_names))) {
+    A_names <- sigma_names
+  }
+  
+  dimnames(A) <- list(1:n, A_names) 
+  
+  
+  # Return a matrix if no storage was provided and NULL if it was provided.
+  if( retMat ) {
+    return( A );
+  } else {
+    return( invisible(NULL) )
+  }
+  
+}
+
+rmixt.fork(12, t(fit.rmixn$parameters$mean), 
+           plyr::alply(fit.rmixn$parameters$variance$sigma,3), 
+           w = fit.rmixn$parameters$pro, df = 2) 
+
+
+
+(mbmt <- microbenchmark(rmixt(100000, t(fit.rmixn$parameters$mean), 
+                     plyr::alply(fit.rmixn$parameters$variance$sigma,3), 
+                     w = fit.rmixn$parameters$pro, df = 2),
+               rmixt.fork(100000, t(fit.rmixn$parameters$mean), 
+                          plyr::alply(fit.rmixn$parameters$variance$sigma,3), 
+                          w = fit.rmixn$parameters$pro, df = 2) ) )
+
+
+mbmt %>% 
+  mutate(expr = str_replace_all(as.character(expr), "\\), ", "\\),\n  "),
+         expr = str_replace_all(expr, ", {2,}", ", ")) %>% 
+  ggplot(aes(expr, time/1000000)) + 
+  geom_violin() + coord_flip() + 
+  theme(axis.text.y = element_text(hjust = 0, family = "mono")) +
+  labs(y = "milliseconds", x = "", title = "n = (100,000) * 100")
+```
